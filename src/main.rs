@@ -46,7 +46,7 @@ fn main() {
     daemon::notify(false, &[daemon::NotifyState::Ready]).unwrap();
 
     loop {
-        poll.poll(&mut events, Some(Duration::from_secs(30))).unwrap();
+        poll.poll(&mut events, Some(Duration::from_secs(60))).unwrap();
         info!("Notifying watchdog");
         daemon::notify(false, &[daemon::NotifyState::Watchdog]).unwrap();
 
