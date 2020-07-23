@@ -13,4 +13,4 @@ path = "src/logd.rs"
 libsystemd = { git = "https://github.com/lucab/libsystemd-rs" }
 log = "0.4.11"
 simple-logging = "2.0.2"
-mio = { version = "0.7.0", features = ["os-poll", "uds"] }
+mio = { version = "0.7.0", features = ["os-poll", "os-util", "uds"] }
