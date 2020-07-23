@@ -19,7 +19,7 @@ const SYSLOG: Token = Token(2);
 const AUDLOG: Token = Token(3);
 
 fn main() {
-    simple_logging::log_to_file("/vagrant/pid_eins.log", LevelFilter::Info).unwrap();
+    simple_logging::log_to_file("/vagrant/logd.log", LevelFilter::Info).unwrap();
 
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(128);

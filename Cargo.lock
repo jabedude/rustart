@@ -161,16 +161,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
-name = "pid_eins"
-version = "0.1.0"
-dependencies = [
- "libsystemd",
- "log",
- "mio",
- "simple-logging",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -193,6 +183,16 @@ name = "redox_syscall"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
+
+[[package]]
+name = "rustart"
+version = "0.1.0"
+dependencies = [
+ "libsystemd",
+ "log",
+ "mio",
+ "simple-logging",
+]
 
 [[package]]
 name = "serde"

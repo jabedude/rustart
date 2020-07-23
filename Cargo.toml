@@ -1,5 +1,5 @@
 [package]
-name = "pid_eins"
+name = "rustart"
 version = "0.1.0"
 authors = ["Joshua Abraham <sinisterpatrician@gmail.com>"]
 edition = "2018"
