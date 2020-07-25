@@ -131,7 +131,7 @@ fn run() -> Result<(), Error> {
             match event.token() {
                 STDLOG => {
                     let mut buf = [0u8; 1024];
-                    info!("Got read event on stdout socket");
+                    trace!("Got read event on stdout socket");
                     let sock = &mut streams[&STDLOG].borrow_mut();
                     // TODO: some issues with the stdout socket. Investigate
                     ok_or_error!(sock.read(&mut buf));
@@ -141,7 +141,7 @@ fn run() -> Result<(), Error> {
                 }
                 DEVLOG => {
                     let mut buf = [0u8; 1024];
-                    info!("Got read event on /dev/log");
+                    trace!("Got read event on /dev/log");
                     let sock = &mut datagrams[&DEVLOG].borrow_mut();
                     ok_or_error!(sock.recv(&mut buf));
                     trace!("Read event done on /dev/log");
@@ -150,7 +150,7 @@ fn run() -> Result<(), Error> {
                 }
                 NATLOG => {
                     let mut buf = [0u8; 1024];
-                    info!("Got read event on systemd native socket");
+                    trace!("Got read event on systemd native socket");
                     let sock = &mut datagrams[&NATLOG].borrow_mut();
                     ok_or_error!(sock.recv(&mut buf));
                     trace!("Read event done on systemd native socket");
