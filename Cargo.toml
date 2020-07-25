@@ -10,6 +10,7 @@ name = "logd"
 path = "src/logd.rs"
 
 [dependencies]
+libc = "0.2.73"
 failure = "0.1.7"
 #libsystemd = { git = "https://github.com/jabedude/libsystemd-rs", branch = "unix-sock" }
 libsystemd = { path = "../libsystemd-rs" }

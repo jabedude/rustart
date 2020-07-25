@@ -1,16 +1,26 @@
 use log::{LevelFilter, error, warn, info, debug, trace};
 use libsystemd::{activation, daemon};
+use libsystemd::activation::IsType;
 
-use mio::net::{UnixDatagram, UnixStream};
+use mio::net::{UnixDatagram, UnixStream, UnixListener};
 use mio::unix::SourceFd;
 use mio::{Events, Interest, Poll, Token};
 
 use failure::Error;
 
+use libc::{sockaddr, sockaddr_un, getsockname};
+
 //use std::os::unix::net::UnixDatagram;
 use std::time::Duration;
 use std::io::Read;
 use std::fs::File;
+use std::ffi::CStr;
+use std::path::PathBuf;
+use std::iter::FromIterator;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::os::unix::io::RawFd;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::FromRawFd;
 use std::os::unix::io::IntoRawFd;
@@ -40,6 +50,24 @@ macro_rules! ok_or_error {
     }};
 }
 
+fn sock_unix_path(fd: RawFd) -> Result<PathBuf, Error> {
+    let mut addr: sockaddr_un = sockaddr_un {
+        sun_family: 0,
+        sun_path: [0i8; 108],
+    };
+    let mut len = std::mem::size_of::<sockaddr_un>() as u32;
+    unsafe {
+    if getsockname(fd, &mut addr as *mut _ as *mut sockaddr, &mut len as *mut u32) != 0 {
+        return Err(LogError::FdError.into());
+    }
+    let cstr = CStr::from_ptr(addr.sun_path.as_ptr()).to_str().unwrap();
+    let path = PathBuf::from(cstr);
+    debug!("sock path: {:?}", path);
+
+    Ok(path)
+    }
+}
+
 /// /run/systemd/journal/socket
 const SDJLOG: Token = Token(0);
 /// /dev/log (I think)
@@ -50,24 +78,61 @@ const SYSLOG: Token = Token(2);
 const AUDLOG: Token = Token(3);
 /// Kernel logs (/dev/kmsg)
 const KERNLOG: Token = Token(4);
+/// /run/systemd/journal/stdout
+const STDLOG: Token = Token(5);
 
 fn run() -> Result<(), Error> {
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(128);
     debug!("Starting up");
+    let mut streams: HashMap<Token, RefCell<UnixStream>> = HashMap::new();
+    let mut datagrams: HashMap<Token, RefCell<UnixDatagram>> = HashMap::new();
 
     let mut fds = activation::receive_descriptors(false)?;
     debug!("Received fds: {:?}", fds);
+    if fds.len() != 4 {
+        return Err(LogError::LoggingError.into());
+    }
+
+    let mut stdout_sock: UnixStream;
+
+    while let Some(raw_fd) = fds.pop() {
+        if raw_fd.is_unix() && raw_fd.is_stream() {
+            let raw_fd = raw_fd.into_raw_fd();
+            let path = sock_unix_path(raw_fd)?;
+            info!("path: {:?}", path);
+            if path.ends_with("stdout") {
+                info!("Creating from {}", raw_fd);
+                stdout_sock = unsafe { UnixStream::from_raw_fd(raw_fd) };
+                poll.registry().register(&mut stdout_sock, STDLOG, Interest::READABLE)?;
+                streams.insert(STDLOG, RefCell::new(stdout_sock));
+            }
+        } else if raw_fd.is_unix() && raw_fd.is_dgram() {
+            let raw_fd = raw_fd.into_raw_fd();
+            let path = sock_unix_path(raw_fd)?;
+            info!("path: {:?}", path);
+            if path.ends_with("dev-log") {
+                info!("Creating from {}", raw_fd);
+                let mut devlog_sock = unsafe { UnixDatagram::from_raw_fd(raw_fd) };
+                poll.registry().register(&mut devlog_sock, DEVLOG, Interest::READABLE)?;
+                datagrams.insert(DEVLOG, RefCell::new(devlog_sock));
+            }
+        }
+    }
+
+    info!("Streams: {:?}", streams);
+    info!("Datagrams: {:?}", datagrams);
 
     //let raw_fd = fds.remove(0).into_raw_fd();
+    //unsafe { sock_unix_path(raw_fd); }
     //info!("Creating from {}", raw_fd);
     //let mut unk_sock = unsafe { UnixDatagram::from_raw_fd(raw_fd) };
     //poll.registry().register(&mut unk_sock, AUDLOG, Interest::READABLE)?;
 
-    let raw_fd = fds.remove(1).into_raw_fd();
-    info!("Creating from {}", raw_fd);
-    let mut devlog_sock = unsafe { UnixStream::from_raw_fd(raw_fd) };
-    poll.registry().register(&mut devlog_sock, DEVLOG, Interest::READABLE)?;
+    //let raw_fd = fds.remove(1).into_raw_fd();
+    //info!("Creating from {}", raw_fd);
+    //let mut devlog_sock = unsafe { UnixStream::from_raw_fd(raw_fd) };
+    //poll.registry().register(&mut devlog_sock, DEVLOG, Interest::READABLE)?;
 
     //let raw_fd = fds.remove(2).into_raw_fd();
     //info!("Creating from {}", raw_fd);
@@ -90,18 +155,21 @@ fn run() -> Result<(), Error> {
 
         for event in events.iter() {
             match event.token() {
-                //SDJLOG => {
-                //    let mut buf = [0u8; 1024];
-                //    info!("Got read event on /run/systemd/journal/socket");
-                //    ok_or_error!(sdlog_sock.recv(&mut buf));
-                //    info!("Read event done on /run/systemd/journal/socket");
-                //    let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
-                //    info!("Recieved {}", s);
-                //}
+                STDLOG => {
+                    let mut buf = [0u8; 1024];
+                    info!("Got read event on stdout socket");
+                    let sock = &mut streams[&STDLOG].borrow_mut();
+                    // TODO: some issues with the stdout socket. Investigate
+                    ok_or_error!(sock.read(&mut buf));
+                    info!("Read event done on stdout socket");
+                    let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
+                    info!("Recieved {}", s);
+                }
                 DEVLOG => {
                     let mut buf = [0u8; 1024];
                     info!("Got read event on /dev/log");
-                    ok_or_error!(devlog_sock.read(&mut buf));
+                    let sock = &mut datagrams[&DEVLOG].borrow_mut();
+                    ok_or_error!(sock.recv(&mut buf));
                     info!("Read event done on /dev/log");
                     let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
                     info!("Recieved {}", s);
@@ -111,6 +179,14 @@ fn run() -> Result<(), Error> {
                 //    info!("Got read event on unk fd");
                 //    ok_or_error!(unk_sock.recv(&mut buf));
                 //    info!("Read event done on unk fd");
+                //    let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
+                //    info!("Recieved {}", s);
+                //}
+                //SDJLOG => {
+                //    let mut buf = [0u8; 1024];
+                //    info!("Got read event on /run/systemd/journal/socket");
+                //    ok_or_error!(sdlog_sock.recv(&mut buf));
+                //    info!("Read event done on /run/systemd/journal/socket");
                 //    let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
                 //    info!("Recieved {}", s);
                 //}
