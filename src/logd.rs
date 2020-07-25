@@ -2,26 +2,20 @@ use log::{LevelFilter, error, warn, info, debug, trace};
 use libsystemd::{activation, daemon};
 use libsystemd::activation::IsType;
 
-use mio::net::{UnixDatagram, UnixStream, UnixListener};
-use mio::unix::SourceFd;
+use mio::net::{UnixDatagram, UnixStream};
 use mio::{Events, Interest, Poll, Token};
 
 use failure::Error;
 
 use libc::{sockaddr, sockaddr_un, getsockname};
 
-//use std::os::unix::net::UnixDatagram;
 use std::time::Duration;
 use std::io::Read;
-use std::fs::File;
 use std::ffi::CStr;
 use std::path::PathBuf;
-use std::iter::FromIterator;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::cell::RefCell;
 use std::os::unix::io::RawFd;
-use std::os::unix::io::AsRawFd;
 use std::os::unix::io::FromRawFd;
 use std::os::unix::io::IntoRawFd;
 
@@ -31,8 +25,8 @@ use crate::errors::*;
 
 macro_rules! ok_or_continue {
     ($e:expr) => {{
-        if let Ok(x) = $e {
-            x
+        if let Ok(_x) = $e {
+            _x
         } else {
             continue;
         }
@@ -42,7 +36,7 @@ macro_rules! ok_or_continue {
 macro_rules! ok_or_error {
     ($e:expr) => {{
         match $e {
-            Ok(x) => (),
+            Ok(_x) => (),
             Err(e) => {
                 error!("Error: {:?}", e);
             }
@@ -128,6 +122,7 @@ fn run() -> Result<(), Error> {
     loop {
         poll.poll(&mut events, Some(Duration::from_secs(30)))?;
         trace!("Notifying watchdog");
+        println!("Notifying watchdog");
         if let Err(e) = daemon::notify(false, &[daemon::NotifyState::Watchdog]) {
             error!("Error notifying: {:?}", e);
         }
@@ -140,7 +135,7 @@ fn run() -> Result<(), Error> {
                     let sock = &mut streams[&STDLOG].borrow_mut();
                     // TODO: some issues with the stdout socket. Investigate
                     ok_or_error!(sock.read(&mut buf));
-                    info!("Read event done on stdout socket");
+                    trace!("Read event done on stdout socket");
                     let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
                     info!("Recieved {}", s);
                 }
@@ -149,7 +144,7 @@ fn run() -> Result<(), Error> {
                     info!("Got read event on /dev/log");
                     let sock = &mut datagrams[&DEVLOG].borrow_mut();
                     ok_or_error!(sock.recv(&mut buf));
-                    info!("Read event done on /dev/log");
+                    trace!("Read event done on /dev/log");
                     let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
                     info!("Recieved {}", s);
                 }
@@ -158,7 +153,7 @@ fn run() -> Result<(), Error> {
                     info!("Got read event on systemd native socket");
                     let sock = &mut datagrams[&NATLOG].borrow_mut();
                     ok_or_error!(sock.recv(&mut buf));
-                    info!("Read event done on systemd native socket");
+                    trace!("Read event done on systemd native socket");
                     let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
                     info!("Recieved {}", s);
                 }
@@ -169,8 +164,6 @@ fn run() -> Result<(), Error> {
             }
         }
     }
-
-    Ok(())
 }
 
 fn main() {
