@@ -69,7 +69,7 @@ fn sock_unix_path(fd: RawFd) -> Result<PathBuf, Error> {
 }
 
 /// /run/systemd/journal/socket
-const SDJLOG: Token = Token(0);
+const NATLOG: Token = Token(0);
 /// /dev/log (I think)
 const DEVLOG: Token = Token(1);
 /// /run/systemd/journal/syslog
@@ -116,6 +116,11 @@ fn run() -> Result<(), Error> {
                 let mut devlog_sock = unsafe { UnixDatagram::from_raw_fd(raw_fd) };
                 poll.registry().register(&mut devlog_sock, DEVLOG, Interest::READABLE)?;
                 datagrams.insert(DEVLOG, RefCell::new(devlog_sock));
+            } else if path.ends_with("socket") {
+                info!("Creating from {}", raw_fd);
+                let mut native_sock = unsafe { UnixDatagram::from_raw_fd(raw_fd) };
+                poll.registry().register(&mut native_sock, NATLOG, Interest::READABLE)?;
+                datagrams.insert(NATLOG, RefCell::new(native_sock));
             }
         }
     }
@@ -174,19 +179,20 @@ fn run() -> Result<(), Error> {
                     let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
                     info!("Recieved {}", s);
                 }
+                NATLOG => {
+                    let mut buf = [0u8; 1024];
+                    info!("Got read event on systemd native socket");
+                    let sock = &mut datagrams[&NATLOG].borrow_mut();
+                    ok_or_error!(sock.recv(&mut buf));
+                    info!("Read event done on systemd native socket");
+                    let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
+                    info!("Recieved {}", s);
+                }
                 //AUDLOG => {
                 //    let mut buf = [0u8; 1024];
                 //    info!("Got read event on unk fd");
                 //    ok_or_error!(unk_sock.recv(&mut buf));
                 //    info!("Read event done on unk fd");
-                //    let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
-                //    info!("Recieved {}", s);
-                //}
-                //SDJLOG => {
-                //    let mut buf = [0u8; 1024];
-                //    info!("Got read event on /run/systemd/journal/socket");
-                //    ok_or_error!(sdlog_sock.recv(&mut buf));
-                //    info!("Read event done on /run/systemd/journal/socket");
                 //    let s = ok_or_continue!(std::str::from_utf8(&buf[..]));
                 //    info!("Recieved {}", s);
                 //}
