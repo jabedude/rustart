@@ -11,7 +11,8 @@ path = "src/logd.rs"
 
 [dependencies]
 failure = "0.1.7"
-libsystemd = { git = "https://github.com/lucab/libsystemd-rs" }
+#libsystemd = { git = "https://github.com/jabedude/libsystemd-rs", branch = "unix-sock" }
+libsystemd = { path = "../libsystemd-rs" }
 log = "0.4.11"
 simple-logging = "2.0.2"
 mio = { version = "0.7.0", features = ["os-poll", "os-util", "uds"] }
