@@ -79,6 +79,8 @@ fn run() -> Result<(), Error> {
     let mut fds = activation::receive_descriptors(false)?;
     debug!("Received fds: {:?}", fds);
     if fds.len() != 4 {
+        // Send SD EINVAL (bad args)
+        daemon::notify(false, &[daemon::NotifyState::Errno(22)])?;
         return Err(LogError::LoggingError.into());
     }
 
