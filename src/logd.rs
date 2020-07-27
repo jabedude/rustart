@@ -166,7 +166,7 @@ fn run() -> Result<(), Error> {
 }
 
 fn main() {
-    simple_logging::log_to_file("/vagrant/logd.log", LevelFilter::Trace).unwrap();
+    simple_logging::log_to_file("/var/log/logd.log", LevelFilter::Trace).unwrap();
 
     debug!("starting main loop");
     let res = run();
