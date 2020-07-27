@@ -116,7 +116,7 @@ fn run() -> Result<(), Error> {
     trace!("Streams: {:?}", streams);
     trace!("Datagrams: {:?}", datagrams);
 
-    info!("Sending initial notify");
+    trace!("Sending initial notify");
     daemon::notify(false, &[daemon::NotifyState::Ready])?;
 
     loop {
@@ -166,7 +166,7 @@ fn run() -> Result<(), Error> {
 }
 
 fn main() {
-    simple_logging::log_to_file("/var/log/logd.log", LevelFilter::Trace).unwrap();
+    simple_logging::log_to_file("/var/log/logd.log", LevelFilter::Info).unwrap();
 
     debug!("starting main loop");
     let res = run();
